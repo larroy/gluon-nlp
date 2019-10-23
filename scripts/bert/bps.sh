@@ -34,8 +34,8 @@ export DATAEVAL="${DATAEVAL:-/data/book-corpus/book-corpus-large-split/*.test,/d
 echo $NVIDIA_VISIBLE_DEVICES
 mkdir -p $CKPTDIR
 
-python3 $BPS_HOME/launcher/launch.py \
-	python3 run_pretraining.py \
+python3 -u $BPS_HOME/launcher/launch.py \
+	python3 -u run_pretraining.py \
             --data=$DATA \
             --data_eval=$DATAEVAL \
 	    --optimizer $OPTIMIZER \
