@@ -26,7 +26,7 @@ export EVALINTERVAL=100000000
 export COMMIT=58435d04
 export NO_DROPOUT=0
 export USE_BOUND=1
-export USE_BOUND=1
+export ADJUST_BOUND=1
 export WINDOW_SIZE=2000
 
 if [ "$USE_DOCKER" = "1" ]; then
@@ -40,17 +40,18 @@ sleep 5
 if [ "$DEBUG" = "1" ]; then
     export LOGINTERVAL=1
     export NUMSTEPS=5
-    export OPTIONS='--synthetic_data --verbose --local_fs'
-    export NUMSTEPS=50
+    export OPTIONS='--synthetic_data --verbose'
+    export NUMSTEPS=500000
     export LOGINTERVAL=5
 else
     export LOGINTERVAL=50
-    export OPTIONS='--local_fs'
     #export NUMSTEPS=7038
     export NUMSTEPS=14063
+    #export OPTIONS='--start_step $NUMSTEPS'
 fi
 #BS=65536 ACC=4 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.006 WARMUP_RATIO=0.2843 bash mul-hvd.sh
-BS=32768 ACC=2 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh
+#BS=32768 ACC=2 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh
+#BS=64 ACC=1 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh
 
 if [ "$USE_DOCKER" = "1" ]; then
     export PORT=12452
@@ -62,11 +63,11 @@ fi
 sleep 5
 if [ "$DEBUG" = "1" ]; then
     export LOGINTERVAL=1
-    export OPTIONS="--synthetic_data --verbose --phase2 --phase1_num_steps=$NUMSTEPS --start_step=$NUMSTEPS --local_fs"
+    export OPTIONS="--synthetic_data --verbose --phase2 --phase1_num_steps=$NUMSTEPS --start_step=$NUMSTEPS"
     export NUMSTEPS=3
 else
     export LOGINTERVAL=50
-    export OPTIONS="--phase2 --phase1_num_steps=$NUMSTEPS --start_step=$NUMSTEPS --local_fs"
+    export OPTIONS="--phase2 --phase1_num_steps=$NUMSTEPS --start_step=$NUMSTEPS"
     export NUMSTEPS=1563
 fi
 BS=32768 ACC=16 MAX_SEQ_LENGTH=512 MAX_PREDICTIONS_PER_SEQ=80 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh

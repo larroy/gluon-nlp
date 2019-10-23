@@ -539,6 +539,7 @@ if __name__ == '__main__':
                                              len(ctxs), shuffle, 1, vocab)
 
         evaluate(dataset_eval, model, ctxs, args.log_interval, args.dtype, local_rank, 8)
+    mx.nd.waitall()
     if backend == 'horovod':
         hvd.allreduce_(sync_point, average=False, name='sync_point')
     elif backend == 'byteps':

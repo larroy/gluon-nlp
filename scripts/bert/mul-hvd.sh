@@ -25,7 +25,8 @@ mpirun -np $NP --hostfile $HOST -display-allocation --allow-run-as-root \
             -x LD_LIBRARY_PATH=$HOME/aws-ofi-nccl/install/lib/:$HOME/nccl/build/lib:/usr/local/cuda-10.0/lib64:/opt/amazon/efa/lib64:$LD_LIBRARY_PATH \
 	    -x WINDOW_SIZE=$WINDOW_SIZE \
 	    -x MXNET_SAFE_ACCUMULATION=1 \
-            -x NCCL_TREE_THRESHOLD=0 \
+            -x NCCL_TREE_THRESHOLD=15360000 \
+            -x ADJUST_BOUND=$ADJUST_BOUND \
             -x TRUNCATE_NORM=$TRUNCATE_NORM \
             -x LAMB_BULK=$LAMB_BULK \
             -x EPS_AFTER_SQRT=$EPS_AFTER_SQRT \
