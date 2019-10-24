@@ -138,7 +138,7 @@ class LAMB2(Optimizer):
         self._bulk = int(os.environ.get('LAMB_BULK', 0))
         logging.info(" bulk = " + str(self._bulk))
         self._verbose = verbose
-        if os.environ.get('USE_BOUND', False):
+        if int(os.environ.get('USE_BOUND', False)):
             logging.info("using upper lower bound")
             self._use_bound = True
         else:
