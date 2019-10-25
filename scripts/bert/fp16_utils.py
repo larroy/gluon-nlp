@@ -20,6 +20,7 @@ import warnings
 import collections
 import mxnet as mx
 from mxnet import nd
+import os
 
 from mxnet.optimizer import Optimizer, register
 from mxnet.engine import bulk
@@ -128,7 +129,6 @@ class LAMB2(Optimizer):
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.bias_correction = bias_correction
-        import os
         import logging
         if os.environ.get('EPS_AFTER_SQRT', False):
             self._eps_after_sqrt = True
