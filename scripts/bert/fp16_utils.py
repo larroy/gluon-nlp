@@ -158,6 +158,11 @@ class LAMB2(Optimizer):
             self._adjust_bound = True
         else:
             self._adjust_bound = False
+        if int(os.environ.get('SCALE_NORM', False)):
+            logging.info("scale by per layer norm")
+            self._scale_norm = True
+        else:
+            self._scale_norm = False
         logging.info('attrs = {}'.format(str(self.__dict__)))
 
 
@@ -183,6 +188,8 @@ class LAMB2(Optimizer):
         with bulk(self._bulk):
             # preprocess grad
             grad *= self.rescale_grad
+            if self._scale_norm:
+                grad /= grad.norm()
             if self.clip_gradient is not None:
                 grad = clip(grad, -self.clip_gradient, self.clip_gradient)
 
@@ -393,7 +400,10 @@ class FP16Trainer:
         if max_norm:
             _, ratio, is_finite = grad_global_norm(self.fp32_trainer._params,
                                                    max_norm * self._scaler.loss_scale)
-            step_size = ratio * step_size
+            if int(os.environ.get('SKIP_GLOBAL_CLIP', False)):
+                pass
+            else:
+                step_size = ratio * step_size
             if self._support_nan_check:
                 self.fp32_trainer.update(step_size)
                 overflow = is_finite.asscalar() < 1

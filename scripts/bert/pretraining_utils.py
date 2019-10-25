@@ -30,10 +30,55 @@ from data.pretrain import BERTSamplerFn, BERTDataLoaderFn
 from data.dataloader import SimpleDatasetFn, DatasetLoader
 from create_pretraining_data import create_training_instances
 
+import math
+import warnings
+import random
+import numpy as np
+from mxnet.gluon.data import Sampler
 
 __all__ = ['get_model_loss', 'get_pretrain_data_npz', 'get_dummy_dataloader',
            'save_parameters', 'save_states', 'evaluate', 'split_and_load',
            'get_pretrain_data_text', 'generate_dev_set', 'profile']
+
+class ShuffleSplitSampler(Sampler):
+    """Split the dataset into `num_parts` parts and randomly sample from the part
+    with index `part_index`.
+
+    The data is randomly shuffled at each iteration within each partition.
+
+    Parameters
+    ----------
+    length: int
+      Number of examples in the dataset
+    num_parts: int
+      Number of partitions which the data is split into
+    part_index: int
+      The index of the part to read from
+    """
+    def __init__(self, length, num_parts=1, part_index=0, seed=0):
+        if length % num_parts != 0:
+            warnings.warn('Length ({}) must be a multiple of the number of partitions ({}).'.format(length, num_parts))
+        self._seed = seed
+        self._state = np.random.RandomState(seed)
+        self._indices = list(range(length))
+        # Compute the length of each partition
+        part_len = length // num_parts
+        # Compute the start index for this partition
+        self._start = part_len * part_index
+        # Compute the end index for this partition
+        self._end = self._start + part_len
+        if part_index == num_parts - 1:
+            self._end = length
+
+    def __iter__(self):
+        self._state.shuffle(self._indices)
+        # Extract examples between `start` and `end`, shuffle and return them.
+        indices = list(self._indices[self._start:self._end])
+        return iter(indices)
+
+    def __len__(self):
+        return self._end - self._start
+
 
 def get_model_loss(ctx, model, pretrained, dataset_name, vocab, dtype,
                    ckpt_dir=None, start_step=None):
@@ -190,6 +235,9 @@ def get_pretrain_data_text(data, batch_size, num_ctxes, shuffle,
     sampler_fn = BERTSamplerFn(batch_size, shuffle, num_ctxes, num_buckets)
     dataloader_fn = BERTDataLoaderFn(num_ctxes, vocab)
 
+    file_sampler_cls = nlp.data.SplitSampler
+    if int(os.environ.get('EVEN_SHUFFLE', False)):
+        file_sampler_cls = ShuffleSplitSampler
     split_sampler = nlp.data.SplitSampler(num_files, num_parts=num_parts, part_index=part_idx)
     dataloader = DatasetLoader(data, split_sampler, dataset_fn, sampler_fn, dataloader_fn,
                                num_dataset_workers=num_workers)
