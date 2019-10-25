@@ -16,7 +16,7 @@
 # under the License.
 
 """Trainer for mixed precision training."""
-import warnings
+import warnings, logging, os
 import collections
 import mxnet as mx
 from mxnet import nd
@@ -128,8 +128,6 @@ class LAMB2(Optimizer):
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
         self.bias_correction = bias_correction
-        import os
-        import logging
         if os.environ.get('EPS_AFTER_SQRT', False):
             self._eps_after_sqrt = True
             logging.info('self._eps_after_sqrt = ' + str(self._eps_after_sqrt))
@@ -159,6 +157,7 @@ class LAMB2(Optimizer):
         else:
             self._adjust_bound = False
         logging.info('attrs = {}'.format(str(self.__dict__)))
+        self._logged_missing_key = False
 
 
     def create_state(self, index, weight):
@@ -170,7 +169,6 @@ class LAMB2(Optimizer):
 
     def update(self, index, weight, grad, state):
         if self._verbose:
-            import logging
             logging.info('rescale gradient factor = {}'.format(str(self.rescale_grad)))
         assert(isinstance(weight, NDArray))
         assert(isinstance(grad, NDArray))
@@ -178,7 +176,17 @@ class LAMB2(Optimizer):
         lr = self._get_lr(index)
         wd = self._get_wd(index)
         t = self._index_update_count[index]
-        name = self.idx2name[index]
+        self._use_bound = self._use_bound if hasattr(self, '_use_bound') else False
+        self._adjust_bound = self._adjust_bound if hasattr(self, '_adjust_bound') else False
+        self._force_wd = self._force_wd if hasattr(self, '_force_wd') else False
+        self._use_proj = self._use_proj if hasattr(self, '_use_proj') else False
+        try:
+            name = self.idx2name[index]
+        except KeyError as e:
+            if not self._logged_missing_key:
+                warnings.warn(str(e))
+            self._logged_missing_key = True
+            name = ''
 
         with bulk(self._bulk):
             # preprocess grad
@@ -206,8 +214,10 @@ class LAMB2(Optimizer):
                     if self._use_proj or self._adjust_bound:
                         if 'weight' in name:
                             upper_bound = min(upper_bound, 0.01 * math.sqrt(weight.size))
+                            # logging.info('name = {}, weight.size = {}, bound = {}'.format(name, weight.size, upper_bound))
                         if 'classifier' in name or 'cls' in name:
                             upper_bound = min(upper_bound, 0.04 * math.sqrt(weight.size))
+                            # logging.info('name = {}, weight.size = {}, bound = {}'.format(name, weight.size, upper_bound))
                     r1 = minimum(maximum(r1, self.lower_bound), upper_bound)
                 mean_hat = mean / (1. - power(self.beta1, t))
                 var_hat = var / (1. - power(self.beta2, t))
@@ -242,7 +252,6 @@ class LAMB2(Optimizer):
                 if 'classifier' in name or 'cls' in name:
                     alpha = 0.04 * math.sqrt(weight.size)
                 if alpha:
-                    import logging
                     # logging.info("before project: name = {}, norm = {}".format(name, weight.norm().asscalar()))
                     weight[:] = _projection(weight, var_hat, alpha=alpha)
                     # logging.info("after project: name = {}, norm = {}".format(name, weight.norm().asscalar()))
@@ -328,7 +337,6 @@ def grad_global_norm(parameters, max_norm):
     scale_or_one = nd.maximum(nd.ones((1,), dtype=dtype, ctx=ctx), scale)
     choices = nd.concat(scale, scale_or_one, dim=0)
     chosen_scale = choices.take(is_finite)
-    #import logging
     #logging.info("total norm = {}, max_norm = {}, scale = {} ".format(total_norm.asscalar(), max_norm.asscalar(), chosen_scale.asscalar()))
     return total_norm, chosen_scale, is_finite
 
@@ -369,7 +377,6 @@ class FP16Trainer:
             else:
                 ls = loss * self._scaler.loss_scale
         if verbose:
-            import logging
             #import byteps.mxnet as bps
             #logging.info('{} loss scale = {}'.format(bps.rank(), self._scaler.loss_scale))
             logging.info('loss scale = {}'.format(self._scaler.loss_scale))
@@ -400,7 +407,6 @@ class FP16Trainer:
             else:
                 overflow = is_finite.asscalar() < 1
                 if verbose:
-                    import logging
                     import byteps.mxnet as bps
                     logging.info('{} overflow = {}, ratio = {}'.format(bps.rank(), overflow, ratio.asscalar()))
                 if not overflow:
@@ -470,7 +476,6 @@ class DynamicLossScaler(LossScaler):
 
     def update_scale(self, overflow):
         """dynamically update loss scale"""
-        import logging
         iter_since_rescale = self._num_steps - self._last_rescale_iter
         if overflow:
             logging.info('DynamicLossScaler: overflow detected.')

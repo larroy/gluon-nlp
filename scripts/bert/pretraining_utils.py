@@ -83,11 +83,14 @@ def get_model_loss(ctx, model, pretrained, dataset_name, vocab, dtype,
             model.initialize(init=mx.init.Normal(0.02), ctx=ctx)
     model.cast(dtype)
 
+    load_again = False
     if ckpt_dir and start_step:
         param_path = os.path.join(ckpt_dir, '%07d.params'%start_step)
-        nlp.utils.load_parameters(model, param_path, ctx=ctx, cast_dtype=True)
-        logging.info('Loading step %d checkpoints from %s.', start_step, param_path)
-
+        try:
+            nlp.utils.load_parameters(model, param_path, ctx=ctx, cast_dtype=True)
+            logging.info('Loading step %d checkpoints from %s.', start_step, param_path)
+        except AssertionError:
+            load_again = True
     # losses
     nsp_loss = mx.gluon.loss.SoftmaxCELoss()
     mlm_loss = mx.gluon.loss.SoftmaxCELoss()
@@ -96,6 +99,11 @@ def get_model_loss(ctx, model, pretrained, dataset_name, vocab, dtype,
 
     model = BERTForPretrain(model, nsp_loss, mlm_loss, len(vocabulary))
     model.hybridize(static_alloc=True, static_shape=True)
+
+    if load_again:
+        param_path = os.path.join(ckpt_dir, '%07d.params'%start_step)
+        nlp.utils.load_parameters(model, param_path, ctx=ctx, cast_dtype=True)
+        logging.info('Loading step %d checkpoints from %s.', start_step, param_path)
     return model, vocabulary
 
 class BERTPretrainDataset(mx.gluon.data.ArrayDataset):
