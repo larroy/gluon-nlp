@@ -365,8 +365,13 @@ def train(data_train, data_eval, model):
                 if step_num <= num_warmup_steps:
                     new_lr = lr * step_num / num_warmup_steps
                 else:
-                    offset = lr * step_num / num_train_steps
-                    new_lr = lr - offset
+                    if int(os.environ.get('PT_DECAY', False)):
+                        offset = (num_train_steps - step_num) / (num_train_steps - num_warmup_steps)
+                        new_lr = lr * max(offset, 0)
+                    else:
+                        offset = lr * step_num / num_train_steps
+                        new_lr = lr - offset
+
                 trainer.set_learning_rate(new_lr)
                 if args.profile:
                     profile(step_num, 10, 14, profile_name=args.profile + str(rank))

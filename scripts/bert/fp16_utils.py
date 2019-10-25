@@ -20,6 +20,7 @@ import warnings, logging, os
 import collections
 import mxnet as mx
 from mxnet import nd
+import os
 
 from mxnet.optimizer import Optimizer, register
 from mxnet.engine import bulk
@@ -136,7 +137,7 @@ class LAMB2(Optimizer):
         self._bulk = int(os.environ.get('LAMB_BULK', 0))
         logging.info(" bulk = " + str(self._bulk))
         self._verbose = verbose
-        if os.environ.get('USE_BOUND', False):
+        if int(os.environ.get('USE_BOUND', False)):
             logging.info("using upper lower bound")
             self._use_bound = True
         else:
@@ -156,6 +157,11 @@ class LAMB2(Optimizer):
             self._adjust_bound = True
         else:
             self._adjust_bound = False
+        if int(os.environ.get('SCALE_NORM', False)):
+            logging.info("scale by per layer norm")
+            self._scale_norm = True
+        else:
+            self._scale_norm = False
         logging.info('attrs = {}'.format(str(self.__dict__)))
         self._logged_missing_key = False
 
@@ -191,6 +197,8 @@ class LAMB2(Optimizer):
         with bulk(self._bulk):
             # preprocess grad
             grad *= self.rescale_grad
+            if self._scale_norm:
+                grad /= grad.norm()
             if self.clip_gradient is not None:
                 grad = clip(grad, -self.clip_gradient, self.clip_gradient)
 
@@ -400,7 +408,10 @@ class FP16Trainer:
         if max_norm:
             _, ratio, is_finite = grad_global_norm(self.fp32_trainer._params,
                                                    max_norm * self._scaler.loss_scale)
-            step_size = ratio * step_size
+            if int(os.environ.get('SKIP_GLOBAL_CLIP', False)):
+                pass
+            else:
+                step_size = ratio * step_size
             if self._support_nan_check:
                 self.fp32_trainer.update(step_size)
                 overflow = is_finite.asscalar() < 1
