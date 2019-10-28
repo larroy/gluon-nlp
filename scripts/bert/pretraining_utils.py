@@ -246,7 +246,7 @@ def get_pretrain_data_text(data, batch_size, num_ctxes, shuffle,
     file_sampler_cls = nlp.data.SplitSampler
     if int(os.environ.get('EVEN_SHUFFLE', False)):
         file_sampler_cls = ShuffleSplitSampler
-    split_sampler = nlp.data.SplitSampler(num_files, num_parts=num_parts, part_index=part_idx)
+    split_sampler = file_sampler_cls(num_files, num_parts=num_parts, part_index=part_idx)
     dataloader = DatasetLoader(data, split_sampler, dataset_fn, sampler_fn, dataloader_fn,
                                num_dataset_workers=num_workers)
     return dataloader

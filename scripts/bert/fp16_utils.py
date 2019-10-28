@@ -403,7 +403,8 @@ class FP16Trainer:
             max value for global 2-norm of gradients.
         """
         if num_ctxs and num_ctxs > 1:
-            self.fp32_trainer.allreduce_grads()
+            if not int(os.environ.get('SKIP_COMM', False)):
+                self.fp32_trainer.allreduce_grads()
         step_size = batch_size * self._scaler.loss_scale
         if max_norm is not None:
             _, ratio, is_finite = grad_global_norm(self.fp32_trainer._params,
