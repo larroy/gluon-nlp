@@ -291,7 +291,7 @@ def train(data_train, data_eval, model):
                                loss_scaler_params=loss_scale_param)
 
     if args.start_step:
-        if int(os.environ.get('SKIP_STATE_LOADING', False)):
+        if not int(os.environ.get('SKIP_STATE_LOADING', False)):
             state_path = os.path.join(args.ckpt_dir, '%07d.states.%02d'%(args.start_step, local_rank))
             logging.info('Loading trainer state from %s', state_path)
             nlp.utils.load_states(trainer, state_path)
