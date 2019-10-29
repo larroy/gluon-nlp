@@ -326,15 +326,15 @@ def train(data_train, data_eval, model):
     num_ctxes = len(ctxs)
     parallel = nlp.utils.Parallel(num_ctxes if num_ctxes > 1 else 0, parallel_model)
 
-    sync_point = mx.nd.ones((1), ctx=mx.gpu(local_rank))
+    eval_mlm_loss = mx.nd.ones((1), ctx=mx.gpu(local_rank))
     if backend == 'byteps':
         logging.info('Broadcast local_num_masks tensor')
         bps.byteps_declare_tensor(local_num_masks, "local_num_masks")
         bps.byteps_push_pull(local_num_masks, is_average=False, name="local_num_masks", priority=0)
         local_num_masks.wait_to_read()
-        bps.byteps_declare_tensor(sync_point, "sync_point")
-        bps.byteps_push_pull(sync_point, is_average=False, name="sync_point", priority=0)
-        sync_point.wait_to_read()
+        bps.byteps_declare_tensor(eval_mlm_loss, "eval_mlm_loss")
+        bps.byteps_push_pull(eval_mlm_loss, is_average=True, name="eval_mlm_loss", priority=0)
+        eval_mlm_loss.wait_to_read()
         bps.byteps_declare_tensor(local_mlm_loss, "local_mlm_loss")
         bps.byteps_push_pull(local_mlm_loss, is_average=False, name="local_mlm_loss", priority=0)
         local_mlm_loss.wait_to_read()
@@ -543,12 +543,12 @@ if __name__ == '__main__':
         dataset_eval = get_pretrain_data_npz(data_eval, batch_size_eval,
                                              len(ctxs), shuffle, 1, vocab)
 
-        evaluate(dataset_eval, model, ctxs, args.log_interval, args.dtype, local_rank, 8)
+        eval_mlm_loss = evaluate(dataset_eval, model, ctxs, args.log_interval, args.dtype, local_rank, 8)
     mx.nd.waitall()
     if backend == 'horovod':
-        hvd.allreduce_(sync_point, average=False, name='sync_point')
+        hvd.allreduce_(eval_mlm_loss, average=False, name='eval_mlm_loss')
     elif backend == 'byteps':
-        bps.byteps_push_pull(sync_point, is_average=False,
-                             name="sync_point", priority=0)
-    sync_point.wait_to_read()
-    logging.info("Done")
+        bps.byteps_push_pull(eval_mlm_loss, is_average=True,
+                             name="eval_mlm_loss", priority=0)
+    eval_mlm_loss.wait_to_read()
+    logging.info("Done. Eval loss = {}".format(eval_mlm_loss.asscalar()))
