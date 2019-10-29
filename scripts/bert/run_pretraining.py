@@ -242,6 +242,7 @@ assert batch_size_eval > 0
 logging.info("{} / {}".format(rank, num_workers))
 
 early_stop = os.environ.get('HOROVOD_TIMELINE', None)
+eval_mlm_loss = None
 
 def train(data_train, data_eval, model):
     """Training function."""
