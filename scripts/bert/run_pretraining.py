@@ -325,6 +325,8 @@ def train(data_train, data_eval, model):
         if accumulate > 1:
             for p in params:
                 p.grad_req = 'add'
+    else:
+        logging.info("Enabled manual accumulation")
 
     train_begin_time = time.time()
     begin_time = time.time()
