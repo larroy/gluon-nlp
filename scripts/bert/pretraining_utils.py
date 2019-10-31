@@ -79,6 +79,16 @@ class ShuffleSplitSampler(Sampler):
     def __len__(self):
         return self._end - self._start
 
+class RepeatSplitSampler(nlp.data.SplitSampler):
+    def __init__(self, length, num_parts=1, part_index=0, repeat=40):
+        super(self, RepeatSplitSampler, length, num_parts=num_parts, part_index=part_index)
+        self.repeat = repeat
+
+    def __iter__(self):
+        l = []
+        for i in range(self.repeat):
+            l.extend(list(super(self, RepeatSplitSampler).__iter__()))
+        return iter(l)
 
 def get_model_loss(ctx, model, pretrained, dataset_name, vocab, dtype,
                    ckpt_dir=None, start_step=None):
@@ -243,7 +253,10 @@ def get_pretrain_data_text(data, batch_size, num_ctxes, shuffle,
     sampler_fn = BERTSamplerFn(batch_size, shuffle, num_ctxes, num_buckets)
     dataloader_fn = BERTDataLoaderFn(num_ctxes, vocab)
 
-    file_sampler_cls = nlp.data.SplitSampler
+    if int(os.environ.get('REPEAT_SAMPLER', False)):
+        file_sampler_cls = RepeatSplitSampler
+    else:
+        file_sampler_cls = nlp.data.SplitSampler
     if int(os.environ.get('EVEN_SHUFFLE', False)):
         file_sampler_cls = ShuffleSplitSampler
     split_sampler = file_sampler_cls(num_files, num_parts=num_parts, part_index=part_idx)
