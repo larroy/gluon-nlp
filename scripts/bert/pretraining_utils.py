@@ -81,13 +81,13 @@ class ShuffleSplitSampler(Sampler):
 
 class RepeatSplitSampler(nlp.data.SplitSampler):
     def __init__(self, length, num_parts=1, part_index=0, repeat=40):
-        super(self, RepeatSplitSampler).__init__(length, num_parts=num_parts, part_index=part_index)
+        super(RepeatSplitSampler, self).__init__(length, num_parts=num_parts, part_index=part_index)
         self.repeat = repeat
 
     def __iter__(self):
         l = []
         for i in range(self.repeat):
-            l.extend(list(super(self, RepeatSplitSampler).__iter__()))
+            l.extend(list(super(RepeatSplitSampler, self).__iter__()))
         return iter(l)
 
 def get_model_loss(ctx, model, pretrained, dataset_name, vocab, dtype,
