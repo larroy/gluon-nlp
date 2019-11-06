@@ -22,6 +22,7 @@ __all__ = ['DatasetLoader', 'SamplerFn', 'DatasetFn', 'DataLoaderFn']
 
 import multiprocessing
 from gluonnlp.data.stream import _PathDataset
+import os
 
 class DatasetFn:
     """Callable object to generate a gluon.data.Dataset given a url.
