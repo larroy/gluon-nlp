@@ -195,7 +195,9 @@ class BERTPretrainDataset(mx.gluon.data.ArrayDataset):
                  vocab, num_workers=1, worker_pool=None):
         logging.debug('start to load file %s ...', filename)
         dupe_factor = 1
-        instances = create_training_instances(([filename], tokenizer, max_seq_length,
+        if not isinstance(filename, (list, tuple)):
+            filename = [filename]
+        instances = create_training_instances((filename, tokenizer, max_seq_length,
                                                short_seq_prob, masked_lm_prob,
                                                max_predictions_per_seq,
                                                whole_word_mask, vocab,
