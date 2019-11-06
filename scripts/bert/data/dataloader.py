@@ -106,7 +106,7 @@ class _MultiWorkerIter:
 
     def _push_next_dataset(self):
         """Assign next dataset workload to workers."""
-        circle_length = int(os.environ.get('CIRCLE_LEN'), 1)
+        circle_length = int(os.environ.get('CIRCLE_LEN', 1))
         if circle_length > 1:
             current_dataset_idx = self._sent_idx * circle_length
             if current_dataset_idx < len(self._dataset):
