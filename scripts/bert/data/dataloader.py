@@ -105,10 +105,23 @@ class _MultiWorkerIter:
 
     def _push_next_dataset(self):
         """Assign next dataset workload to workers."""
-        if self._sent_idx < len(self._dataset):
-            url = self._dataset[self._sent_idx]
+        circle_length = int(os.environ.get('CIRCLE_LEN'), 1)
+        if circle_length > 1:
+            current_dataset_idx = self._sent_idx * circle_length
+            if current_dataset_idx < len(self._dataset):
+                circle_length = min(circle_length,
+                                    len(self._dataset) - current_dataset_idx)
+                if circle_length > 1:
+                    url = [self._dataset[current_dataset_idx + i] for i in range(circle_length)]
+                else:
+                    url = self._dataset[current_dataset_idx]
+            else:
+                return
         else:
-            return
+            if self._sent_idx < len(self._dataset):
+                url = self._dataset[self._sent_idx]
+            else:
+                return
         # push to worker asynchronously
         async_ret = self._worker_pool.apply_async(
             self._worker_fn, (url, self._dataset_fn, self._sampler_fn))
