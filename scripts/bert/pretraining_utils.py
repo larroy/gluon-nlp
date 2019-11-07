@@ -80,7 +80,7 @@ class ShuffleSplitSampler(Sampler):
         return self._end - self._start
 
 class RepeatSplitSampler(nlp.data.SplitSampler):
-    def __init__(self, length, num_parts=1, part_index=0, repeat=8):
+    def __init__(self, length, num_parts=1, part_index=0, repeat=40):
         super(RepeatSplitSampler, self).__init__(length, num_parts=num_parts, part_index=part_index)
         self.repeat = repeat
 
