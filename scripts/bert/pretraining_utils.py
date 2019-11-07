@@ -40,6 +40,56 @@ __all__ = ['get_model_loss', 'get_pretrain_data_npz', 'get_dummy_dataloader',
            'save_parameters', 'save_states', 'evaluate', 'split_and_load',
            'get_pretrain_data_text', 'generate_dev_set', 'profile']
 
+class FP32LayerNorm(mx.gluon.nn.LayerNorm):
+    """BERT style Layer Normalization.
+
+    Epsilon is added inside the square root and set to 1e-12 by default.
+
+    Inputs:
+        - **data**: input tensor with arbitrary shape.
+        - **out**: output tensor with the same shape as `data`.
+    """
+
+    def __init__(self, epsilon=1e-12, in_channels=0, prefix=None, params=None):
+        super(FP32LayerNorm, self).__init__(epsilon=epsilon, in_channels=in_channels,
+                                            prefix=prefix, params=params)
+    def cast(self, dtype):
+        logging.info("Using FP32 layernorm")
+
+    def hybrid_forward(self, F, data, gamma, beta):
+        """forward computation."""
+        return F.LayerNorm(data.astype('float32'), gamma=gamma, beta=beta, axis=self._axis, eps=self._epsilon).astype('float16')
+
+if int(os.environ.get('FP32_LN', False)):
+    nlp.model.bert.BERTLayerNorm = FP32LayerNorm
+
+def _fp32_masked_softmax(F, att_score, mask, dtype):
+    """Ignore the masked elements when calculating the softmax
+
+    Parameters
+    ----------
+    F : symbol or ndarray
+    att_score : Symborl or NDArray
+        Shape (batch_size, query_length, memory_length)
+    mask : Symbol or NDArray or None
+        Shape (batch_size, query_length, memory_length)
+    Returns
+    -------
+    att_weights : Symborl or NDArray
+        Shape (batch_size, query_length, memory_length)
+    """
+    # Fill in the masked scores with a very small value
+    logging.info("Using FP32 SoftMax")
+    neg = -1e18
+    mask = mask.astype('float32')
+    att_score = att_score.astype('float32')
+    att_score = F.where(mask, att_score, neg * F.ones_like(att_score))
+    att_weights = F.softmax(att_score, axis=-1) * mask
+    return att_weights.astype('float16')
+
+if int(os.environ.get('FP32_SM', False)):
+    nlp.model.attention_cell._masked_softmax = _fp32_masked_softmax
+
 class ShuffleSplitSampler(Sampler):
     """Split the dataset into `num_parts` parts and randomly sample from the part
     with index `part_index`.
