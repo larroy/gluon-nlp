@@ -1,8 +1,14 @@
+# This script launches the following training jobs
+# 1) BERT pre-train phase 1 (with seq-len = 128)
+# 2) BERT pre-train phase 2 (with seq-len = 512). This requires the checkpoint from (1)
+# 3) BERT fine-tune on SQuAD. This requires the checkpoint from (2).
+
 export DEBUG="${DEBUG:-1}"
 export HOST="${HOST:-hosts_32}"
 export NP="${NP:-8}"
-export CKPTDIR="${CKPTDIR:-/fsx/test}"
+export CKPTDIR="${CKPTDIR:-./test-ckpt}"
 export OPTIMIZER="${OPTIMIZER:-lamb2}"
+export COMPLETE_TRAIN="${COMPLETE_TRAIN:-0}"
 
 export USE_DOCKER=0
 export OTHER_HOST=hosts_31
@@ -48,14 +54,26 @@ else
     export NUMSTEPS=14063
     #export OPTIONS='--start_step $NUMSTEPS'
 fi
-#BS=65536 ACC=4 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.006 WARMUP_RATIO=0.2843 bash mul-hvd.sh
-#BS=32768 ACC=2 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh
+
+#################################################################
+# 1) BERT pre-train phase 1 (with seq-len = 128)
 if [ "$NP" = "1" ]; then
     BS=64 ACC=1 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.0001 WARMUP_RATIO=0.2 bash mul-hvd.sh
 elif [ "$NP" = "8" ]; then
     BS=512 ACC=1 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh
+elif [ "$NP" = "256" ]; then
+    #BS=32768 ACC=2 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh
+    BS=65536 ACC=4 MAX_SEQ_LENGTH=128 MAX_PREDICTIONS_PER_SEQ=20 LR=0.006 WARMUP_RATIO=0.2843 bash mul-hvd.sh
 fi
+#################################################################
 
+
+#################################################################
+# 2) BERT pre-train phase 2 (with seq-len = 512). This requires the checkpoint from (1)
+if [ "$COMPLETE_TRAIN" = "0" ]; then
+    # skip phase 2 if COMPLETE_TRAIN = 0
+    exit
+fi
 if [ "$USE_DOCKER" = "1" ]; then
     export PORT=12452
     bash clush-hvd.sh
@@ -74,6 +92,11 @@ else
     export NUMSTEPS=1563
 fi
 BS=32768 ACC=16 MAX_SEQ_LENGTH=512 MAX_PREDICTIONS_PER_SEQ=80 LR=0.005 WARMUP_RATIO=0.2 bash mul-hvd.sh
+#################################################################
 
+
+#################################################################
+# 3) BERT fine-tune on SQuAD. This requires the checkpoint from (2).
 STEP_FORMATTED=$(printf "%07d" $NUMSTEPS)
 python3 finetune_squad.py --bert_model bert_24_1024_16 --pretrained_bert_parameters $CKPTDIR/$STEP_FORMATTED.params --output_dir $CKPTDIR --optimizer adam --accumulate 3 --batch_size 8 --lr 3e-5 --epochs 2 --gpu 0
+#################################################################
