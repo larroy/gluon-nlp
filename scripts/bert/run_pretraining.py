@@ -374,6 +374,7 @@ def train(data_train, data_eval, model):
         data_train_iter = iter(data_train)
         end_of_batch = False
         next_data_batch = next(data_train_iter)
+        logging.info('Reading data batches from a new file now')
         while not end_of_batch:
             data_batch = next_data_batch
             if step_num >= num_train_steps:
