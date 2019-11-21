@@ -25,7 +25,7 @@ import os
 from mxnet.optimizer import Optimizer, register
 from mxnet.engine import bulk
 from mxnet.ndarray import zeros, ones_like, NDArray
-from mxnet.ndarray import square, power, sqrt, maximum, minimum, clip, where
+from mxnet.ndarray import square, power, sqrt, maximum, minimum, clip, where, lamb_update_phase1, lamb_update_phase2
 
 import math
 
@@ -272,6 +272,53 @@ class LAMB2(Optimizer):
                     weight[:] = _projection(weight, var_hat, alpha=alpha)
                     # logging.info("after project: name = {}, norm = {}".format(name, weight.norm().asscalar()))
 
+@register
+class LAMB3(Optimizer):
+    """LAMB Optimizer.
+    """
+    def __init__(self, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-6,
+                 lower_bound=None, upper_bound=None, bias_correction=False, **kwargs):
+        super(LAMB3, self).__init__(learning_rate=learning_rate, **kwargs)
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        self.bias_correction = bias_correction
+
+
+    def create_state(self, index, weight):
+        stype = weight.stype
+        dtype = weight.dtype
+        return (zeros(weight.shape, weight.context, dtype=dtype, stype=stype),
+                zeros(weight.shape, weight.context, dtype=dtype, stype=stype))
+
+    def update(self, index, weight, grad, state):
+        assert(isinstance(weight, NDArray))
+        assert(isinstance(grad, NDArray))
+        self._update_count(index)
+        lr = self._get_lr(index)
+        wd = self._get_wd(index)
+        t = self._index_update_count[index]
+
+        kwargs = {'beta1': self.beta1, 'beta2': self.beta2, 'epsilon': self.epsilon,
+                  'bias_correction': self.bias_correction, 't': t,
+                  'rescale_grad': self.rescale_grad}
+        mean, var = state
+        if self.clip_gradient:
+            kwargs['clip_gradient'] = self.clip_gradient
+        g = lamb_update_phase1(weight, grad, mean, var, wd=wd, **kwargs)
+
+        kwargs = {}
+        if self.lower_bound:
+            kwargs['lower_bound'] = self.lower_bound
+        if self.upper_bound:
+            kwargs['upper_bound'] = self.upper_bound
+        r_1 = weight.norm()
+        r_2 = g.norm()
+        lamb_update_phase2(weight, g, r_1, r_2, lr=lr, out=weight, **kwargs)
+
+
 def grad_global_norm(parameters, max_norm):
     """Calculate the 2-norm of gradients of parameters, and how much they should be scaled down
     such that their 2-norm does not exceed `max_norm`.
@@ -413,14 +460,14 @@ class FP16Trainer:
         if num_ctxs and num_ctxs > 1:
             if not int(os.environ.get('SKIP_COMM', False)):
                 self.fp32_trainer.allreduce_grads()
-        step_size = batch_size * self._scaler.loss_scale
+        step_size = (batch_size * self._scaler.loss_scale).asscalar()
         if max_norm is not None:
             _, ratio, is_finite = grad_global_norm(self.fp32_trainer._params,
                                                    max_norm * self._scaler.loss_scale)
             if int(os.environ.get('SKIP_GLOBAL_CLIP', False)):
                 pass
             else:
-                step_size = ratio * step_size
+                step_size = (ratio * step_size).asscalar()
             if self._support_nan_check:
                 self.fp32_trainer.update(step_size)
                 overflow = is_finite.asscalar() < 1

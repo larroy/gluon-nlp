@@ -5,10 +5,10 @@
 export DATA_HOME=~/mxnet-data/bert-pretraining/datasets
 
 export DEBUG="${DEBUG:-1}"
-export HOST="${HOST:-hosts_32}"
+export HOST="${HOST:-hosts}"
 export NP="${NP:-8}"
 export CKPTDIR="${CKPTDIR:-./test-ckpt}"
-export OPTIMIZER="${OPTIMIZER:-lamb2}"
+export OPTIMIZER="${OPTIMIZER:-lamb3}"
 export COMPLETE_TRAIN="${COMPLETE_TRAIN:-0}"
 export DATA="${DATA:-$DATA_HOME/book-corpus/book-corpus-large-split/*.train,$DATA_HOME/enwiki/enwiki-feb-doc-split/*.train}"
 export DATAEVAL="${DATAEVAL:-$DATA_HOME/book-corpus/book-corpus-large-split/*.dev,$DATA_HOME/enwiki/enwiki-feb-doc-split/*.dev}"

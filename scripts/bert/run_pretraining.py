@@ -35,6 +35,7 @@ import logging
 import functools
 import time
 import argparse
+import sys
 
 import mxnet as mx
 import gluonnlp as nlp
@@ -571,6 +572,7 @@ if __name__ == '__main__':
                                         num_parts=num_workers, part_idx=rank,
                                         num_workers=args.num_data_workers)
         train(data_train, data_eval, model)
+        sys.exit(0)
     if data_eval:
         # eval data is always based on a fixed npz file.
         shuffle = False
